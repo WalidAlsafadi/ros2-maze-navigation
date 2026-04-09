@@ -84,23 +84,32 @@ def generate_launch_description():
         parameters=[{
             'goal_x': goal_x,
             'goal_y': goal_y,
+
+            # Simple-maze potential field tuning
             'k_att': 1.0,
             'k_rep': 0.12,
             'd_obs': 0.65,
             'max_linear_vel': 0.18,
             'max_angular_vel': 1.5,
 
-            'bonus_mode': bonus_mode,
-            'stuck_distance_threshold': 0.03,
-            'stuck_cycles_threshold': 35,
-            'escape_cycles': 18,
-            'escape_linear_vel': 0.04,
-            'escape_angular_vel': 1.0,
+            # Shared safety / stopping
+            'goal_tolerance': 0.20,
+            'front_clearance_distance': 0.40,
+            'front_blocked_distance': 0.24,
+            'front_slow_linear_cap': 0.05,
 
-            'front_slowdown_distance': 0.22,
-            'front_slow_linear_cap': 0.06,
-        }]
-    )
+            # Bonus mode switch
+            'bonus_mode': bonus_mode,
+
+            # Bug2-style bonus mode tuning
+            'wall_follow_side': 'left',
+            'wall_target_distance': 0.38,
+            'wall_follow_linear_vel': 0.07,
+            'wall_kp': 1.6,
+            'goal_heading_kp': 1.5,
+            'mline_tolerance': 0.18,
+            'leave_goal_improvement': 0.18,
+        }])
 
     return LaunchDescription([
         world_arg,
