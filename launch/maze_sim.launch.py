@@ -30,15 +30,11 @@ def generate_launch_description():
     goal_x_arg = DeclareLaunchArgument('goal_x', default_value='9.0')
     goal_y_arg = DeclareLaunchArgument('goal_y', default_value='9.0')
 
-    # Bonus mode is OFF by default so simple maze behavior stays untouched
-    bonus_mode_arg = DeclareLaunchArgument('bonus_mode', default_value='false')
-
     world = LaunchConfiguration('world')
     spawn_x = LaunchConfiguration('spawn_x')
     spawn_y = LaunchConfiguration('spawn_y')
     goal_x = LaunchConfiguration('goal_x')
     goal_y = LaunchConfiguration('goal_y')
-    bonus_mode = LaunchConfiguration('bonus_mode')
 
     world_path = PathJoinSubstitution([pkg_maze_nav, 'worlds', world])
 
@@ -84,32 +80,16 @@ def generate_launch_description():
         parameters=[{
             'goal_x': goal_x,
             'goal_y': goal_y,
-
-            # Simple-maze potential field tuning
             'k_att': 1.0,
             'k_rep': 0.12,
             'd_obs': 0.65,
             'max_linear_vel': 0.18,
             'max_angular_vel': 1.5,
-
-            # Shared safety / stopping
             'goal_tolerance': 0.20,
             'front_clearance_distance': 0.40,
-            'front_blocked_distance': 0.24,
             'front_slow_linear_cap': 0.05,
-
-            # Bonus mode switch
-            'bonus_mode': bonus_mode,
-
-            # Bug2-style bonus mode tuning
-            'wall_follow_side': 'left',
-            'wall_target_distance': 0.38,
-            'wall_follow_linear_vel': 0.07,
-            'wall_kp': 1.6,
-            'goal_heading_kp': 1.5,
-            'mline_tolerance': 0.18,
-            'leave_goal_improvement': 0.18,
-        }])
+        }]
+    )
 
     return LaunchDescription([
         world_arg,
@@ -117,7 +97,6 @@ def generate_launch_description():
         spawn_y_arg,
         goal_x_arg,
         goal_y_arg,
-        bonus_mode_arg,
         SetEnvironmentVariable('TURTLEBOT3_MODEL', 'burger'),
         gz_sim_cmd,
         start_robot_spawner_cmd,

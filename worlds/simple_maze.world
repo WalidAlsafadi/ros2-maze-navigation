@@ -11,8 +11,6 @@
    <plugin filename="gz-sim-sensors-system" name="gz::sim::systems::Sensors">
   <render_engine>ogre2</render_engine>
 </plugin> 
-    <!-- TODO: Are any system plugins missing? Hint: LiDAR needs to be simulated... -->
-
    <!-- Lighting and Ground -->
     <light type="directional" name="sun">
       <cast_shadows>true</cast_shadows>

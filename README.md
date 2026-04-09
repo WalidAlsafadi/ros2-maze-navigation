@@ -21,6 +21,7 @@ The base project was developed for the **simple maze** environment and is design
 - **ROS 2 version:** Jazzy
 - **Simulator:** Gazebo Harmonic / `ros_gz`
 - **Base world:** `simple_maze.world`
+- **Bonus world:** `complex_maze.world`
 - **Default spawn point:** `(0.5, 0.5)`
 - **Default goal point:** `(9.0, 9.0)`
 
@@ -28,11 +29,12 @@ The base project was developed for the **simple maze** environment and is design
 
 This repository contains the custom `maze_navigation` package:
 
-- `launch/maze_sim.launch.py` — launches Gazebo, spawns the robot, starts the ROS-Gazebo bridge, and starts the planner
-- `maze_navigation/potential_field_planner.py` — Potential Field planner implementation
+- `launch/maze_sim.launch.py` — launches the base/simple maze configuration
+- `launch/maze_bonus.launch.py` — launches the bonus/complex maze configuration
+- `maze_navigation/potential_field_planner.py` — base Potential Field planner
+- `maze_navigation/potential_field_bonus_planner.py` — bonus planner with separate escape behavior
 - `worlds/simple_maze.world` — base maze world
 - `worlds/complex_maze.world` — bonus maze world
-- `config/maze_gui.config` — Gazebo GUI configuration
 
 ## Prerequisites
 
@@ -107,10 +109,10 @@ ros2 launch maze_navigation maze_sim.launch.py
 
 This launches:
 
-- Gazebo with the maze world
+- Gazebo with the simple maze world
 - TurtleBot3 Burger at the default spawn point
 - `ros_gz_bridge` for `/clock`, `/odom`, `/scan`, and `/cmd_vel`
-- the `potential_field_planner` node
+- the base `potential_field_planner` node
 
 ## Default Base Run
 
@@ -121,7 +123,6 @@ The default launch configuration for the main/base project is:
 - `spawn_y:=0.5`
 - `goal_x:=9.0`
 - `goal_y:=9.0`
-- `bonus_mode:=false`
 
 Equivalent explicit launch command:
 
@@ -131,8 +132,7 @@ ros2 launch maze_navigation maze_sim.launch.py \
   spawn_x:=0.5 \
   spawn_y:=0.5 \
   goal_x:=9.0 \
-  goal_y:=9.0 \
-  bonus_mode:=false
+  goal_y:=9.0
 ```
 
 ## Custom Launch Parameters
@@ -145,8 +145,7 @@ ros2 launch maze_navigation maze_sim.launch.py \
   spawn_x:=0.5 \
   spawn_y:=0.5 \
   goal_x:=9.0 \
-  goal_y:=9.0 \
-  bonus_mode:=false
+  goal_y:=9.0
 ```
 
 Examples:
@@ -163,9 +162,19 @@ ros2 launch maze_navigation maze_sim.launch.py goal_x:=8.0 goal_y:=8.5
 ros2 launch maze_navigation maze_sim.launch.py spawn_x:=1.0 spawn_y:=1.0 goal_x:=9.0 goal_y:=9.0
 ```
 
+## Bonus Launch
+
+The bonus/complex maze can be launched separately using:
+
+```bash
+ros2 launch maze_navigation maze_bonus.launch.py
+```
+
+This keeps the main/base submission path clean while separating bonus logic into dedicated files.
+
 ## How the Planner Works
 
-The planner uses a Potential Field method:
+The base planner uses a Potential Field method:
 
 - **Attractive force:** pulls the robot toward the goal
 - **Repulsive force:** pushes the robot away from nearby obstacles detected by LiDAR
@@ -225,6 +234,17 @@ Check that:
 - `TURTLEBOT3_MODEL=burger` is exported
 - the planner node is running
 - the bridge is running correctly
+
+### `maze_bonus.launch.py` not found after adding new files
+
+Rebuild and source the workspace again:
+
+```bash
+cd ~/ros2_project_ws
+source /opt/ros/jazzy/setup.bash
+colcon build --packages-select maze_navigation --symlink-install
+source ~/ros2_project_ws/install/setup.bash
+```
 
 ### Simulation feels slow on WSL
 
