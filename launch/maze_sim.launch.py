@@ -4,7 +4,7 @@ from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, SetEnvironmentVariable, TimerAction
 from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch.substitutions import LaunchConfiguration
+from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
 from launch_ros.actions import Node
 
 
@@ -12,9 +12,7 @@ def generate_launch_description():
     pkg_maze_nav = get_package_share_directory('maze_navigation')
     pkg_ros_gz_sim = get_package_share_directory('ros_gz_sim')
     pkg_turtlebot3_gazebo = get_package_share_directory('turtlebot3_gazebo')
-    gui_config = os.path.expanduser('~/ros2_project_ws/src/maze_navigation/config/maze_gui.config')
 
-    world_file = os.path.join(pkg_maze_nav, 'worlds', 'simple_maze.world')
     robot_sdf = os.path.join(
         pkg_turtlebot3_gazebo,
         'models',
@@ -22,18 +20,34 @@ def generate_launch_description():
         'model.sdf'
     )
 
+    world_arg = DeclareLaunchArgument(
+        'world',
+        default_value='simple_maze.world',
+        description='World file inside maze_navigation/worlds'
+    )
+    spawn_x_arg = DeclareLaunchArgument('spawn_x', default_value='0.5')
+    spawn_y_arg = DeclareLaunchArgument('spawn_y', default_value='0.5')
     goal_x_arg = DeclareLaunchArgument('goal_x', default_value='9.0')
     goal_y_arg = DeclareLaunchArgument('goal_y', default_value='9.0')
 
+    # Bonus mode is OFF by default so simple maze behavior stays untouched
+    bonus_mode_arg = DeclareLaunchArgument('bonus_mode', default_value='false')
+
+    world = LaunchConfiguration('world')
+    spawn_x = LaunchConfiguration('spawn_x')
+    spawn_y = LaunchConfiguration('spawn_y')
     goal_x = LaunchConfiguration('goal_x')
     goal_y = LaunchConfiguration('goal_y')
+    bonus_mode = LaunchConfiguration('bonus_mode')
+
+    world_path = PathJoinSubstitution([pkg_maze_nav, 'worlds', world])
 
     gz_sim_cmd = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             os.path.join(pkg_ros_gz_sim, 'launch', 'gz_sim.launch.py')
         ),
         launch_arguments={
-            'gz_args': f'--gui-config {gui_config} -r {world_file}'
+            'gz_args': ['-r ', world_path]
         }.items()
     )
 
@@ -43,8 +57,8 @@ def generate_launch_description():
         arguments=[
             '-file', robot_sdf,
             '-name', 'turtlebot3_burger',
-            '-x', '0.5',
-            '-y', '0.5',
+            '-x', spawn_x,
+            '-y', spawn_y,
             '-z', '0.01',
         ],
         output='screen'
@@ -70,17 +84,40 @@ def generate_launch_description():
         parameters=[{
             'goal_x': goal_x,
             'goal_y': goal_y,
+
+            # Simple-maze potential field tuning
             'k_att': 1.0,
-            'k_rep': 0.25,
-            'd_obs': 1.0,
+            'k_rep': 0.12,
+            'd_obs': 0.65,
             'max_linear_vel': 0.18,
             'max_angular_vel': 1.5,
-        }]
-    )
+
+            # Shared safety / stopping
+            'goal_tolerance': 0.20,
+            'front_clearance_distance': 0.40,
+            'front_blocked_distance': 0.24,
+            'front_slow_linear_cap': 0.05,
+
+            # Bonus mode switch
+            'bonus_mode': bonus_mode,
+
+            # Bug2-style bonus mode tuning
+            'wall_follow_side': 'left',
+            'wall_target_distance': 0.38,
+            'wall_follow_linear_vel': 0.07,
+            'wall_kp': 1.6,
+            'goal_heading_kp': 1.5,
+            'mline_tolerance': 0.18,
+            'leave_goal_improvement': 0.18,
+        }])
 
     return LaunchDescription([
+        world_arg,
+        spawn_x_arg,
+        spawn_y_arg,
         goal_x_arg,
         goal_y_arg,
+        bonus_mode_arg,
         SetEnvironmentVariable('TURTLEBOT3_MODEL', 'burger'),
         gz_sim_cmd,
         start_robot_spawner_cmd,
