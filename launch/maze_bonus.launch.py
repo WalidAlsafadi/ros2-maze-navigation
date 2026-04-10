@@ -80,19 +80,30 @@ def generate_launch_description():
         parameters=[{
             'goal_x': goal_x,
             'goal_y': goal_y,
+            'spawn_x': spawn_x,
+            'spawn_y': spawn_y,
+
             'max_linear_vel': 0.18,
             'max_angular_vel': 1.5,
             'goal_tolerance': 0.20,
+
             'front_clearance_distance': 0.40,
             'front_blocked_distance': 0.24,
             'front_slow_linear_cap': 0.05,
+
             'wall_follow_side': 'left',
             'wall_target_distance': 0.38,
             'wall_follow_linear_vel': 0.07,
             'wall_kp': 1.6,
+
             'goal_heading_kp': 1.5,
             'mline_tolerance': 0.18,
             'leave_goal_improvement': 0.18,
+
+            'goal_clear_heading_error': 0.50,
+            'goal_clear_sector_half_width': 0.20,
+            'goal_clearance_cap': 0.75,
+            'min_wall_follow_steps': 12,
         }]
     )
 
