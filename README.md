@@ -2,18 +2,20 @@
 
 Autonomous maze navigation project built with **ROS 2 Jazzy**, **Gazebo Harmonic**, and **TurtleBot3 Burger** using the **Potential Field Method** for local navigation and obstacle avoidance.
 
+## Highlights
+
+- ROS 2 Jazzy + Gazebo Harmonic integration
+- TurtleBot3 Burger simulation and spawn pipeline
+- `ros_gz_bridge` for `/scan`, `/odom`, `/cmd_vel`, and `/clock`
+- Potential Field local navigation with attractive and repulsive forces
+- Invalid LiDAR filtering for `0.0`, `inf`, and `nan`
+- Stable **simple-maze** navigation with **0.20 m** goal tolerance
+
 ## Project Summary
 
 This project implements autonomous maze navigation in Gazebo Sim using a TurtleBot3 Burger robot. The robot is spawned in a maze world, receives **LiDAR** and **odometry** data through `ros_gz_bridge`, computes **attractive** and **repulsive** forces, and publishes velocity commands to move safely toward a goal while avoiding collisions.
 
-The base project was developed for the **simple maze** environment and is designed to satisfy the main project requirements:
-
-- robot integration in ROS 2 Jazzy and Gazebo
-- Gazebo environment launch and robot spawning
-- topic bridging for `/scan`, `/odom`, `/cmd_vel`, and `/clock`
-- Potential Field navigation
-- invalid LiDAR filtering
-- stopping within **0.2 m** of the goal
+The main submission path focuses on the **base project** in the **simple maze** environment.
 
 ## Robot and Environment
 
@@ -21,20 +23,24 @@ The base project was developed for the **simple maze** environment and is design
 - **ROS 2 version:** Jazzy
 - **Simulator:** Gazebo Harmonic / `ros_gz`
 - **Base world:** `simple_maze.world`
-- **Bonus world:** `complex_maze.world`
+- **Optional bonus world:** `complex_maze.world`
 - **Default spawn point:** `(0.5, 0.5)`
 - **Default goal point:** `(9.0, 9.0)`
 
+## Repository Scope
+
+This repository contains the custom `maze_navigation` package only.
+
+The TurtleBot3 packages are external upstream dependencies and should be cloned into the same ROS 2 workspace as shown below.
+
 ## Repository Contents
 
-This repository contains the custom `maze_navigation` package:
-
 - `launch/maze_sim.launch.py` — launches the base/simple maze configuration
-- `launch/maze_bonus.launch.py` — launches the bonus/complex maze configuration
+- `launch/maze_bonus.launch.py` — launches the optional bonus/complex maze configuration
 - `maze_navigation/potential_field_planner.py` — base Potential Field planner
-- `maze_navigation/potential_field_bonus_planner.py` — bonus planner with separate escape behavior
+- `maze_navigation/potential_field_bonus_planner.py` — optional bonus planner with separate escape behavior
 - `worlds/simple_maze.world` — base maze world
-- `worlds/complex_maze.world` — bonus maze world
+- `worlds/complex_maze.world` — optional bonus maze world
 
 ## Prerequisites
 
@@ -62,6 +68,24 @@ sudo apt install -y \
   ros-jazzy-dynamixel-sdk
 ```
 
+## Quick Start
+
+```bash
+mkdir -p ~/ros2_project_ws/src
+cd ~/ros2_project_ws/src
+git clone https://github.com/WalidAlsafadi/ros2-maze-navigation.git maze_navigation
+git clone -b jazzy https://github.com/ROBOTIS-GIT/turtlebot3_msgs.git
+git clone -b jazzy https://github.com/ROBOTIS-GIT/turtlebot3.git
+git clone -b jazzy https://github.com/ROBOTIS-GIT/turtlebot3_simulations.git
+cd ~/ros2_project_ws
+source /opt/ros/jazzy/setup.bash
+rosdep install --from-paths src --ignore-src -r -y
+colcon build --symlink-install
+source ~/ros2_project_ws/install/setup.bash
+export TURTLEBOT3_MODEL=burger
+ros2 launch maze_navigation maze_sim.launch.py
+```
+
 ## Step-by-Step Build and Launch Instructions
 
 ### Step 1: Create a ROS 2 workspace
@@ -85,7 +109,15 @@ git clone -b jazzy https://github.com/ROBOTIS-GIT/turtlebot3.git
 git clone -b jazzy https://github.com/ROBOTIS-GIT/turtlebot3_simulations.git
 ```
 
-### Step 4: Build the workspace
+### Step 4: Install workspace dependencies
+
+```bash
+cd ~/ros2_project_ws
+source /opt/ros/jazzy/setup.bash
+rosdep install --from-paths src --ignore-src -r -y
+```
+
+### Step 5: Build the workspace
 
 ```bash
 cd ~/ros2_project_ws
@@ -93,7 +125,7 @@ source /opt/ros/jazzy/setup.bash
 colcon build --symlink-install
 ```
 
-### Step 5: Source the workspace
+### Step 6: Source the workspace
 
 ```bash
 source /opt/ros/jazzy/setup.bash
@@ -101,7 +133,7 @@ source ~/ros2_project_ws/install/setup.bash
 export TURTLEBOT3_MODEL=burger
 ```
 
-### Step 6: Launch the base project
+### Step 7: Launch the base project
 
 ```bash
 ros2 launch maze_navigation maze_sim.launch.py
@@ -148,29 +180,28 @@ ros2 launch maze_navigation maze_sim.launch.py \
   goal_y:=9.0
 ```
 
-Examples:
-
-### Run the base maze with a different goal
+### Example: different goal
 
 ```bash
 ros2 launch maze_navigation maze_sim.launch.py goal_x:=8.0 goal_y:=8.5
 ```
 
-### Spawn at a different position for testing
+### Example: different spawn point
 
 ```bash
 ros2 launch maze_navigation maze_sim.launch.py spawn_x:=1.0 spawn_y:=1.0 goal_x:=9.0 goal_y:=9.0
 ```
 
-## Bonus Launch
+## Results
 
-The bonus/complex maze can be launched separately using:
+Base testing was performed in the simple maze with:
 
-```bash
-ros2 launch maze_navigation maze_bonus.launch.py
-```
+- **Start:** `(0.5, 0.5)`
+- **Goal:** `(9.0, 9.0)`
+- **Planner:** Potential Field
+- **Goal tolerance:** `0.20 m`
 
-This keeps the main/base submission path clean while separating bonus logic into dedicated files.
+In repeated runs, the robot consistently reached the goal region and stopped within the required tolerance.
 
 ## How the Planner Works
 
@@ -191,9 +222,9 @@ The planner publishes:
 
 ## Requirement Coverage
 
-The base project implementation covers the following required items:
+The base implementation covers the following required items:
 
-- **Robot selection and integration:** TurtleBot3 Burger integrated into ROS 2 Jazzy workspace
+- **Robot selection and integration:** TurtleBot3 Burger integrated into a ROS 2 Jazzy workspace
 - **Gazebo environment setup:** simple maze world launched in Gazebo Sim
 - **Bridge setup:** `/scan`, `/odom`, `/cmd_vel`, and `/clock` bridged using `ros_gz_bridge`
 - **Potential Field implementation:** attractive and repulsive force navigation
@@ -205,7 +236,17 @@ The base project implementation covers the following required items:
 - Goal completion is evaluated using the robot's odometry position.
 - The final stopping position may vary slightly between runs due to simulation timing and the continuous nature of Potential Field control.
 - Small visual differences in the final stop position in the Gazebo GUI are acceptable as long as the robot stops within the required goal tolerance.
-- The main/base project focuses on the **simple maze**. The complex maze is bonus work and is not required for the base submission.
+- The main/base project focuses on the **simple maze**. The complex maze is optional bonus work and is not required for the base submission.
+
+## Optional Bonus Launch
+
+The optional bonus/complex maze can be launched separately using:
+
+```bash
+ros2 launch maze_navigation maze_bonus.launch.py
+```
+
+This keeps the main/base submission path clean while separating bonus logic into dedicated files.
 
 ## Troubleshooting
 
@@ -235,7 +276,7 @@ Check that:
 - the planner node is running
 - the bridge is running correctly
 
-### `maze_bonus.launch.py` not found after adding new files
+### New launch file not found after adding files
 
 Rebuild and source the workspace again:
 
