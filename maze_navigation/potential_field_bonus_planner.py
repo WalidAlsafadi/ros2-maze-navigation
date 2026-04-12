@@ -14,10 +14,10 @@ class PotentialFieldBonusPlanner(Node):
     def __init__(self):
         super().__init__('potential_field_bonus_planner')
 
-        self.declare_parameter('goal_x', 10.5)
-        self.declare_parameter('goal_y', 1.0)
-        self.declare_parameter('spawn_x', 1.0)
-        self.declare_parameter('spawn_y', 10.0)
+        self.declare_parameter('goal_x', 11.4)
+        self.declare_parameter('goal_y', 11.4)
+        self.declare_parameter('spawn_x', 0.6)
+        self.declare_parameter('spawn_y', 0.6)
 
         self.declare_parameter('max_linear_vel', 0.18)
         self.declare_parameter('max_angular_vel', 1.5)
@@ -105,6 +105,7 @@ class PotentialFieldBonusPlanner(Node):
         self.wall_start_x = None
         self.wall_start_y = None
         self.wall_start_goal_dist = None
+        self.best_wall_goal_dist = None
 
         self.cmd_vel_pub = self.create_publisher(TwistStamped, '/cmd_vel', 10)
         self.odom_sub = self.create_subscription(Odometry, '/odom', self.odom_callback, 10)
@@ -275,6 +276,7 @@ class PotentialFieldBonusPlanner(Node):
         self.wall_start_x = self.current_x
         self.wall_start_y = self.current_y
         self.wall_start_goal_dist = goal_dist
+        self.best_wall_goal_dist = goal_dist
 
     def maybe_flip_wall_side(self):
         if self.wall_follow_steps < self.wall_progress_check_steps:
@@ -288,7 +290,7 @@ class PotentialFieldBonusPlanner(Node):
             self.current_y - self.wall_start_y
         )
 
-        if goal_progress >= self.min_goal_progress and pose_progress >= self.min_pose_progress:
+        if goal_progress >= self.min_goal_progress or pose_progress >= self.min_pose_progress:
             return False
 
         old_side = self.wall_follow_side
@@ -335,46 +337,69 @@ class PotentialFieldBonusPlanner(Node):
     def should_leave_wall(self):
         if self.hit_goal_dist is None:
             return False
+        if self.best_wall_goal_dist is None:
+            return False
 
-        front = self.front_distance()
         goal_dist = self.distance_to_goal()
-        heading_error = abs(self.goal_heading_error())
 
-        return (
-            self.on_m_line()
-            and goal_dist < (self.hit_goal_dist - self.leave_goal_improvement)
-            and front > self.front_clearance_distance
-            and heading_error < 0.50
-        )
+        # Do not leave if we are already getting worse again.
+        if goal_dist > (self.best_wall_goal_dist + 0.05):
+            return False
+
+        # Canonical Bug2 leave condition:
+        # back on m-line, closer than hit point, and goal direction clear.
+        if not self.on_m_line():
+            return False
+
+        if goal_dist >= (self.hit_goal_dist - 0.05):
+            return False
+
+        return self.goal_direction_clear()
+
 
     def run_follow_wall(self):
         front = self.front_distance()
         self.wall_follow_steps += 1
-        self.maybe_flip_wall_side()
+
+        goal_dist = self.distance_to_goal()
+        heading_error = self.goal_heading_error()
+
+        if self.best_wall_goal_dist is None or goal_dist < self.best_wall_goal_dist:
+            self.best_wall_goal_dist = goal_dist
+
+        goal_sector_clear = self.get_sector_min_distance(
+            heading_error - 0.30,
+            heading_error + 0.30
+        )
+
+        # Near-goal escape is allowed only if we are still at/near the best
+        # distance reached during this wall-follow episode.
+        near_goal_escape = (
+            self.best_wall_goal_dist is not None
+            and goal_dist <= (self.best_wall_goal_dist + 0.05)
+            and goal_dist < 1.2
+            and abs(heading_error) < 0.85
+            and front > (self.front_blocked_distance + 0.08)
+            and goal_sector_clear > min(goal_dist + 0.15, 0.90)
+        )
+
+        # Keep side flipping disabled for now.
+        # self.maybe_flip_wall_side()
 
         if (
             self.wall_follow_steps >= self.min_wall_follow_steps
-            and front > (self.front_clearance_distance + 0.15)
-            and self.hit_goal_dist is not None
-            and self.distance_to_goal() < (self.hit_goal_dist - 0.03)
-            and self.goal_direction_clear()
+            and (
+                near_goal_escape
+                or self.should_leave_wall()
+            )
         ):
             self.mode = 'GO_TO_GOAL'
             self.wall_follow_steps = 0
             self.get_logger().info(
-                f'Clear shot to goal detected after wall-follow cooldown. '
-                f'goal_dist={self.distance_to_goal():.2f}, '
-                f'heading_error={self.goal_heading_error():.2f}'
-            )
-            self.run_go_to_goal()
-            return
-
-        if self.should_leave_wall():
-            self.mode = 'GO_TO_GOAL'
-            self.wall_follow_steps = 0
-            self.get_logger().info(
-                f'Leave point found. Switching to GO_TO_GOAL. '
-                f'goal_dist={self.distance_to_goal():.2f}'
+                f'Leaving wall-follow. goal_dist={goal_dist:.2f}, '
+                f'best_wall_goal_dist={self.best_wall_goal_dist:.2f}, '
+                f'heading_error={heading_error:.2f}, '
+                f'near_goal_escape={near_goal_escape}'
             )
             self.run_go_to_goal()
             return
@@ -433,12 +458,20 @@ class PotentialFieldBonusPlanner(Node):
 
         goal_dist = self.distance_to_goal()
 
+        if goal_dist < 1.0:
+            self.get_logger().info(
+                f'mode={self.mode}, pose=({self.current_x:.2f},{self.current_y:.2f}), '
+                f'goal=({self.goal_x_odom:.2f},{self.goal_y_odom:.2f}), '
+                f'dist={goal_dist:.3f}'
+            )
+
         if goal_dist <= self.goal_tolerance:
             if not self.goal_reached:
                 self.goal_reached = True
                 self.get_logger().info(
                     f'Goal reached. Final pose=({self.current_x:.2f}, {self.current_y:.2f}), '
-                    f'goal=({self.goal_x_odom:.2f}, {self.goal_y_odom:.2f})'
+                    f'mode={self.mode}, goal=({self.goal_x_odom:.2f}, {self.goal_y_odom:.2f}), '
+                    f'dist={goal_dist:.3f}'
                 )
             self.stop_robot()
             return

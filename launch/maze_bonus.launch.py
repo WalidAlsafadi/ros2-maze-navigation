@@ -25,10 +25,10 @@ def generate_launch_description():
         default_value='complex_maze.world',
         description='World file inside maze_navigation/worlds'
     )
-    spawn_x_arg = DeclareLaunchArgument('spawn_x', default_value='1.0')
-    spawn_y_arg = DeclareLaunchArgument('spawn_y', default_value='10.0')
-    goal_x_arg = DeclareLaunchArgument('goal_x', default_value='10.5')
-    goal_y_arg = DeclareLaunchArgument('goal_y', default_value='1.0')
+    spawn_x_arg = DeclareLaunchArgument('spawn_x', default_value='0.6')
+    spawn_y_arg = DeclareLaunchArgument('spawn_y', default_value='0.6')
+    goal_x_arg = DeclareLaunchArgument('goal_x', default_value='11.4')
+    goal_y_arg = DeclareLaunchArgument('goal_y', default_value='11.4')
 
     world = LaunchConfiguration('world')
     spawn_x = LaunchConfiguration('spawn_x')
@@ -84,26 +84,30 @@ def generate_launch_description():
             'spawn_y': spawn_y,
 
             'max_linear_vel': 0.18,
-            'max_angular_vel': 1.5,
-            'goal_tolerance': 0.20,
+            'max_angular_vel': 1.7,
+            'goal_tolerance': 0.35,
 
-            'front_clearance_distance': 0.40,
-            'front_blocked_distance': 0.24,
-            'front_slow_linear_cap': 0.05,
+            'front_clearance_distance': 0.45,
+            'front_blocked_distance': 0.28,
+            'front_slow_linear_cap': 0.08,
 
             'wall_follow_side': 'left',
-            'wall_target_distance': 0.38,
-            'wall_follow_linear_vel': 0.07,
-            'wall_kp': 1.6,
+            'wall_target_distance': 0.32,
+            'wall_follow_linear_vel': 0.08,
+            'wall_kp': 1.05,
 
-            'goal_heading_kp': 1.5,
-            'mline_tolerance': 0.18,
+            'goal_heading_kp': 1.3,
+            'mline_tolerance': 0.08,
             'leave_goal_improvement': 0.18,
 
-            'goal_clear_heading_error': 0.50,
-            'goal_clear_sector_half_width': 0.20,
-            'goal_clearance_cap': 0.75,
-            'min_wall_follow_steps': 12,
+            'goal_clear_heading_error': 0.45,
+            'goal_clear_sector_half_width': 0.25,
+            'goal_clearance_cap': 1.00,
+            'min_wall_follow_steps': 8,
+
+            'wall_progress_check_steps': 1000000,
+            'min_goal_progress': 0.15,
+            'min_pose_progress': 0.35,
         }]
     )
 
