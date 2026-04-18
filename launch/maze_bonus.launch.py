@@ -83,9 +83,9 @@ def generate_launch_description():
             'spawn_x': spawn_x,
             'spawn_y': spawn_y,
 
-            'max_linear_vel': 0.18,
+            'max_linear_vel': 0.20,
             'max_angular_vel': 1.7,
-            'goal_tolerance': 0.35,
+            'goal_tolerance': 0.20,
 
             'front_clearance_distance': 0.45,
             'front_blocked_distance': 0.28,
@@ -93,7 +93,7 @@ def generate_launch_description():
 
             'wall_follow_side': 'left',
             'wall_target_distance': 0.32,
-            'wall_follow_linear_vel': 0.08,
+            'wall_follow_linear_vel': 0.09,
             'wall_kp': 1.05,
 
             'goal_heading_kp': 1.3,
@@ -105,9 +105,9 @@ def generate_launch_description():
             'goal_clearance_cap': 1.00,
             'min_wall_follow_steps': 8,
 
-            'wall_progress_check_steps': 1000000,
-            'min_goal_progress': 0.15,
-            'min_pose_progress': 0.35,
+            'wall_progress_check_steps': 180,
+            'min_goal_progress': 0.45,
+            'min_pose_progress': 0.20,
         }]
     )
 
@@ -119,7 +119,7 @@ def generate_launch_description():
         goal_y_arg,
         SetEnvironmentVariable('TURTLEBOT3_MODEL', 'burger'),
         gz_sim_cmd,
-        start_robot_spawner_cmd,
+        TimerAction(period=5.0, actions=[start_robot_spawner_cmd]),
         start_gazebo_ros_bridge_cmd,
-        TimerAction(period=3.0, actions=[start_planner_cmd]),
+        TimerAction(period=9.0, actions=[start_planner_cmd]),
     ])
