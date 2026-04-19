@@ -270,19 +270,16 @@ class PotentialFieldBonusPlanner(Node):
         goal_dist = self.distance_to_goal()
         heading_error = self.goal_heading_error()
 
-        # Near the final chamber, be much more permissive:
-        # do not require the robot to already face the goal well,
-        # and do not require large side clearance from the wall.
-        if goal_dist < 2.5:
-            sector_half_width = 0.35
+        # In the late maze, be permissive.
+        if goal_dist < 6.0:
+            sector_half_width = 0.40
             clearance_along_goal = self.get_sector_min_distance(
                 heading_error - sector_half_width,
                 heading_error + sector_half_width
             )
 
-            # Only require that the path toward the goal is clear
-            # approximately up to the goal distance.
-            return clearance_along_goal > max(0.35, goal_dist - 0.10)
+            required_clearance = max(0.30, min(goal_dist, 1.20) - 0.15)
+            return clearance_along_goal > required_clearance
 
         if abs(heading_error) > self.goal_clear_heading_error:
             return False
@@ -449,16 +446,21 @@ class PotentialFieldBonusPlanner(Node):
         if self.best_wall_goal_dist is None or goal_dist < self.best_wall_goal_dist:
             self.best_wall_goal_dist = goal_dist
 
-        # Near-goal hard override first.
+        # Late-maze / near-goal override:
+        # start much earlier than before so the robot does not keep
+        # hugging the wall until it is too late to detach.
         if (
-            goal_dist < 3.5
+            goal_dist < 6.0
             and self.wall_follow_steps >= self.min_wall_follow_steps
-            and front > (self.front_blocked_distance + 0.08)
+            and (
+                self.goal_direction_clear()
+                or front > (self.front_blocked_distance + 0.05)
+            )
         ):
             self.mode = 'GO_TO_GOAL'
             self.wall_follow_steps = 0
             self.get_logger().info(
-                f'Near-goal override. Switching to GO_TO_GOAL. '
+                f'Late-maze override. Switching to GO_TO_GOAL. '
                 f'goal_dist={goal_dist:.2f}, '
                 f'front={front:.2f}, '
                 f'heading_error={self.goal_heading_error():.2f}'
@@ -466,7 +468,6 @@ class PotentialFieldBonusPlanner(Node):
             self.run_go_to_goal()
             return
 
-        # Then try normal leave.
         if self.should_leave_wall():
             self.mode = 'GO_TO_GOAL'
             self.wall_follow_steps = 0
@@ -478,7 +479,6 @@ class PotentialFieldBonusPlanner(Node):
             self.run_go_to_goal()
             return
 
-        # Then try opportunistic leave.
         if (
             self.wall_follow_steps >= self.min_wall_follow_steps
             and self.should_leave_wall_opportunistic()
@@ -493,12 +493,6 @@ class PotentialFieldBonusPlanner(Node):
             )
             self.run_go_to_goal()
             return
-
-        # Only if leave failed, allow late-maze side flipping.
-        if goal_dist < 7.0:
-            flipped = self.maybe_flip_wall_side()
-            if flipped:
-                return
 
         linear_x = self.wall_follow_linear_vel
         angular_z = 0.0
