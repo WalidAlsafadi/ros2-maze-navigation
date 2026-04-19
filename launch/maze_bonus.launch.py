@@ -91,7 +91,7 @@ def generate_launch_description():
             'front_blocked_distance': 0.28,
             'front_slow_linear_cap': 0.08,
 
-            'wall_follow_side': 'left',
+            'wall_follow_side': 'right',
             'wall_target_distance': 0.32,
             'wall_follow_linear_vel': 0.09,
             'wall_kp': 1.05,
@@ -105,7 +105,7 @@ def generate_launch_description():
             'goal_clearance_cap': 1.00,
             'min_wall_follow_steps': 8,
 
-            'wall_progress_check_steps': 180,
+            'wall_progress_check_steps': 90,
             'min_goal_progress': 0.45,
             'min_pose_progress': 0.20,
         }]

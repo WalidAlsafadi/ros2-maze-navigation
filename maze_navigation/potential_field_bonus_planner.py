@@ -27,7 +27,7 @@ class PotentialFieldBonusPlanner(Node):
         self.declare_parameter('front_blocked_distance', 0.24)
         self.declare_parameter('front_slow_linear_cap', 0.05)
 
-        self.declare_parameter('wall_follow_side', 'left')
+        self.declare_parameter('wall_follow_side', 'right')
         self.declare_parameter('wall_target_distance', 0.38)
         self.declare_parameter('wall_follow_linear_vel', 0.07)
         self.declare_parameter('wall_kp', 1.6)
@@ -115,6 +115,28 @@ class PotentialFieldBonusPlanner(Node):
         self.get_logger().info(
             f'Bonus planner initialized. Goal(world)=({self.goal_x_world}, {self.goal_y_world}), mode=Bug2-style'
         )
+
+    def choose_wall_follow_side(self):
+        left_side = self.get_sector_mean_distance(1.10, 1.45)
+        right_side = self.get_sector_mean_distance(-1.45, -1.10)
+
+        left_front = self.get_sector_min_distance(0.20, 1.00)
+        right_front = self.get_sector_min_distance(-1.00, -0.20)
+
+        left_open = min(left_side, left_front)
+        right_open = min(right_side, right_front)
+
+        # If left side is more open, turn left around the obstacle,
+        # which means keep the wall on the RIGHT.
+        if left_open > right_open + 0.05:
+            return 'right'
+
+        # If right side is more open, turn right around the obstacle,
+        # which means keep the wall on the LEFT.
+        if right_open > left_open + 0.05:
+            return 'left'
+
+        return self.default_wall_follow_side
 
     def euler_from_quaternion(self, q):
         siny_cosp = 2.0 * (q.w * q.z + q.x * q.y)
@@ -248,26 +270,31 @@ class PotentialFieldBonusPlanner(Node):
         goal_dist = self.distance_to_goal()
         heading_error = self.goal_heading_error()
 
-        # Near the final chamber, allow a wider heading window.
-        heading_limit = 0.85 if goal_dist < 2.5 else self.goal_clear_heading_error
-        if abs(heading_error) > heading_limit:
+        # Near the final chamber, be much more permissive:
+        # do not require the robot to already face the goal well,
+        # and do not require large side clearance from the wall.
+        if goal_dist < 2.5:
+            sector_half_width = 0.35
+            clearance_along_goal = self.get_sector_min_distance(
+                heading_error - sector_half_width,
+                heading_error + sector_half_width
+            )
+
+            # Only require that the path toward the goal is clear
+            # approximately up to the goal distance.
+            return clearance_along_goal > max(0.35, goal_dist - 0.10)
+
+        if abs(heading_error) > self.goal_clear_heading_error:
             return False
 
-        sector_half_width = 0.28 if goal_dist < 2.5 else self.goal_clear_sector_half_width
         clearance_along_goal = self.get_sector_min_distance(
-            heading_error - sector_half_width,
-            heading_error + sector_half_width
+            heading_error - self.goal_clear_sector_half_width,
+            heading_error + self.goal_clear_sector_half_width
         )
 
-        required_clearance = min(goal_dist, 1.20 if goal_dist < 2.5 else self.goal_clearance_cap)
+        required_clearance = min(goal_dist, self.goal_clearance_cap)
         if clearance_along_goal <= required_clearance:
             return False
-
-        # This is the key fix:
-        # in the final chamber, do NOT require a big side gap from the wall.
-        # Otherwise the robot keeps hugging the wall and does the U-turn you drew.
-        if goal_dist < 2.5:
-            return True
 
         if self.wall_follow_side == 'left':
             side_dist = self.get_sector_mean_distance(1.10, 1.45)
@@ -287,6 +314,15 @@ class PotentialFieldBonusPlanner(Node):
         self.wall_start_goal_dist = goal_dist
         self.best_wall_goal_dist = goal_dist
 
+    def reset_wall_follow_progress_window(self, goal_dist=None):
+        if goal_dist is None:
+            goal_dist = self.distance_to_goal()
+
+        self.wall_follow_steps = 0
+        self.wall_start_x = self.current_x
+        self.wall_start_y = self.current_y
+        self.wall_start_goal_dist = goal_dist
+
     def maybe_flip_wall_side(self):
         if self.wall_follow_steps < self.wall_progress_check_steps:
             return False
@@ -299,14 +335,20 @@ class PotentialFieldBonusPlanner(Node):
             self.current_y - self.wall_start_y
         )
 
-        if goal_progress >= self.min_goal_progress and pose_progress >= self.min_pose_progress:
+        # Only flip if we are clearly doing badly.
+        clearly_stuck = (
+            goal_progress < -0.05
+            or (goal_progress < 0.03 and pose_progress < 0.10)
+        )
+
+        if not clearly_stuck:
             return False
 
         old_side = self.wall_follow_side
         self.wall_follow_side = 'right' if old_side == 'left' else 'left'
 
         new_goal_dist = self.distance_to_goal()
-        self.start_wall_follow_episode(new_goal_dist)
+        self.reset_wall_follow_progress_window(new_goal_dist)
 
         self.get_logger().warn(
             f'Low wall-follow progress. Flipping side {old_side}->{self.wall_follow_side}. '
@@ -322,7 +364,7 @@ class PotentialFieldBonusPlanner(Node):
 
         if front < self.front_blocked_distance:
             self.mode = 'FOLLOW_WALL'
-            self.wall_follow_side = self.default_wall_follow_side
+            self.wall_follow_side = self.choose_wall_follow_side()
             self.start_wall_follow_episode(goal_dist)
 
             self.get_logger().warn(
@@ -333,14 +375,14 @@ class PotentialFieldBonusPlanner(Node):
             return
 
         angular_z = self.goal_heading_kp * heading_error
-        angular_z = max(-self.max_angular_vel, min(self.max_angular_vel, angular_z))
-
+        
         heading_scale = max(0.0, math.cos(heading_error))
         linear_x = self.max_linear_vel * heading_scale
 
         if front < self.front_clearance_distance:
             linear_x = min(linear_x, self.front_slow_linear_cap)
 
+        angular_z = max(-self.max_angular_vel, min(self.max_angular_vel, angular_z))
         self.publish_cmd(linear_x, angular_z)
 
     def should_leave_wall(self):
@@ -351,6 +393,19 @@ class PotentialFieldBonusPlanner(Node):
         goal_dist = self.distance_to_goal()
         heading_error = abs(self.goal_heading_error())
 
+        # Late maze / debug-spawn region:
+        # do not force m-line, and do not require a nearly perfect heading.
+        # If the robot has a reasonably open front and is not getting farther
+        # than its best recent wall-follow distance, let GO_TO_GOAL try.
+        if goal_dist < 7.0:
+            best_dist = self.best_wall_goal_dist if self.best_wall_goal_dist is not None else goal_dist
+            return (
+                front > (self.front_blocked_distance + 0.08)
+                and heading_error < 1.20
+                and goal_dist <= (best_dist + 0.10)
+            )
+
+        # Earlier in the maze, keep the stricter Bug2-style condition.
         return (
             self.on_m_line()
             and goal_dist < (self.hit_goal_dist - self.leave_goal_improvement)
@@ -389,34 +444,61 @@ class PotentialFieldBonusPlanner(Node):
     def run_follow_wall(self):
         front = self.front_distance()
         self.wall_follow_steps += 1
-        self.maybe_flip_wall_side()
 
+        goal_dist = self.distance_to_goal()
+        if self.best_wall_goal_dist is None or goal_dist < self.best_wall_goal_dist:
+            self.best_wall_goal_dist = goal_dist
+
+        # Near-goal hard override first.
         if (
-            self.wall_follow_steps >= self.min_wall_follow_steps
-            and front > (self.front_clearance_distance + 0.15)
-            and self.hit_goal_dist is not None
-            and self.distance_to_goal() < (self.hit_goal_dist - 0.03)
-            and self.goal_direction_clear()
+            goal_dist < 3.5
+            and self.wall_follow_steps >= self.min_wall_follow_steps
+            and front > (self.front_blocked_distance + 0.08)
         ):
             self.mode = 'GO_TO_GOAL'
             self.wall_follow_steps = 0
             self.get_logger().info(
-                f'Clear shot to goal detected after wall-follow cooldown. '
-                f'goal_dist={self.distance_to_goal():.2f}, '
+                f'Near-goal override. Switching to GO_TO_GOAL. '
+                f'goal_dist={goal_dist:.2f}, '
+                f'front={front:.2f}, '
                 f'heading_error={self.goal_heading_error():.2f}'
             )
             self.run_go_to_goal()
             return
 
+        # Then try normal leave.
         if self.should_leave_wall():
             self.mode = 'GO_TO_GOAL'
             self.wall_follow_steps = 0
             self.get_logger().info(
                 f'Leave point found. Switching to GO_TO_GOAL. '
-                f'goal_dist={self.distance_to_goal():.2f}'
+                f'goal_dist={goal_dist:.2f}, '
+                f'heading_error={self.goal_heading_error():.2f}'
             )
             self.run_go_to_goal()
             return
+
+        # Then try opportunistic leave.
+        if (
+            self.wall_follow_steps >= self.min_wall_follow_steps
+            and self.should_leave_wall_opportunistic()
+        ):
+            self.mode = 'GO_TO_GOAL'
+            self.wall_follow_steps = 0
+            self.get_logger().info(
+                f'Opportunistic leave. Switching to GO_TO_GOAL. '
+                f'goal_dist={goal_dist:.2f}, '
+                f'best_wall_goal_dist={self.best_wall_goal_dist:.2f}, '
+                f'heading_error={self.goal_heading_error():.2f}'
+            )
+            self.run_go_to_goal()
+            return
+
+        # Only if leave failed, allow late-maze side flipping.
+        if goal_dist < 7.0:
+            flipped = self.maybe_flip_wall_side()
+            if flipped:
+                return
 
         linear_x = self.wall_follow_linear_vel
         angular_z = 0.0
@@ -426,7 +508,7 @@ class PotentialFieldBonusPlanner(Node):
             front_side_dist = self.get_sector_min_distance(0.35, 1.00)
 
             if front < self.front_blocked_distance:
-                self.publish_cmd(0.0, -self.max_angular_vel)
+                self.publish_cmd(0.03, -0.8 * self.max_angular_vel)
                 return
 
             if side_dist > self.wall_target_distance + 0.18:
@@ -446,7 +528,7 @@ class PotentialFieldBonusPlanner(Node):
             front_side_dist = self.get_sector_min_distance(-1.00, -0.35)
 
             if front < self.front_blocked_distance:
-                self.publish_cmd(0.0, self.max_angular_vel)
+                self.publish_cmd(0.03, 0.8 * self.max_angular_vel)
                 return
 
             if side_dist > self.wall_target_distance + 0.18:
