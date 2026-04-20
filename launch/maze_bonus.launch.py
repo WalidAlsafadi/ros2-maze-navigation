@@ -85,7 +85,7 @@ def generate_launch_description():
 
             'max_linear_vel': 0.20,
             'max_angular_vel': 1.7,
-            'goal_tolerance': 1.5,
+            'goal_tolerance': 0.20,
 
             'front_clearance_distance': 0.45,
             'front_blocked_distance': 0.28,

@@ -222,6 +222,23 @@ class PotentialFieldBonusPlanner(Node):
             return 10.0
         return float(np.mean(self.scan_data[indices]))
 
+    def odom_to_world(self, x_odom, y_odom):
+        if self.start_x is None or self.start_y is None or self.start_yaw is None:
+            return x_odom, y_odom
+
+        dx_odom = x_odom - self.start_x
+        dy_odom = y_odom - self.start_y
+
+        c = math.cos(self.start_yaw)
+        s = math.sin(self.start_yaw)
+
+        dx_world = c * dx_odom - s * dy_odom
+        dy_world = s * dx_odom + c * dy_odom
+
+        x_world = self.spawn_x + dx_world
+        y_world = self.spawn_y + dy_world
+        return x_world, y_world
+
     def distance_to_goal(self):
         if self.goal_x_odom is None or self.goal_y_odom is None:
             return float('inf')
@@ -271,7 +288,7 @@ class PotentialFieldBonusPlanner(Node):
         heading_error = self.goal_heading_error()
 
         # In the late maze, be permissive.
-        if goal_dist < 6.0:
+        if goal_dist < 7.0:
             sector_half_width = 0.40
             clearance_along_goal = self.get_sector_min_distance(
                 heading_error - sector_half_width,
@@ -450,7 +467,7 @@ class PotentialFieldBonusPlanner(Node):
         # start much earlier than before so the robot does not keep
         # hugging the wall until it is too late to detach.
         if (
-            goal_dist < 6.0
+            goal_dist < 7.0
             and self.wall_follow_steps >= self.min_wall_follow_steps
             and (
                 self.goal_direction_clear()
@@ -553,7 +570,8 @@ class PotentialFieldBonusPlanner(Node):
                 self.goal_reached = True
                 self.get_logger().info(
                     f'Goal reached. Final pose=({self.current_x:.2f}, {self.current_y:.2f}), '
-                    f'goal=({self.goal_x_odom:.2f}, {self.goal_y_odom:.2f})'
+                    f'goal=({self.goal_x_odom:.2f}, {self.goal_y_odom:.2f}), '
+                    f'dist={goal_dist:.3f}'
                 )
             self.stop_robot()
             return
