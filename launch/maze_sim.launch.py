@@ -80,12 +80,14 @@ def generate_launch_description():
         parameters=[{
             'goal_x': goal_x,
             'goal_y': goal_y,
+            'spawn_x': spawn_x,
+            'spawn_y': spawn_y,
             'k_att': 1.0,
             'k_rep': 0.12,
             'd_obs': 0.65,
             'max_linear_vel': 0.18,
             'max_angular_vel': 1.5,
-            'goal_tolerance': 0.20,
+            'goal_tolerance': 0.15,
             'front_clearance_distance': 0.40,
             'front_slow_linear_cap': 0.05,
         }]

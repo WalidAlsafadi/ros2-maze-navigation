@@ -16,6 +16,9 @@ class PotentialFieldPlanner(Node):
 
         self.declare_parameter('goal_x', 9.0)
         self.declare_parameter('goal_y', 9.0)
+        self.declare_parameter('spawn_x', 0.5)
+        self.declare_parameter('spawn_y', 0.5)
+
         self.declare_parameter('k_att', 1.0)
         self.declare_parameter('k_rep', 0.12)
         self.declare_parameter('d_obs', 0.65)
@@ -25,8 +28,11 @@ class PotentialFieldPlanner(Node):
         self.declare_parameter('front_clearance_distance', 0.40)
         self.declare_parameter('front_slow_linear_cap', 0.05)
 
-        self.goal_x = float(self.get_parameter('goal_x').value)
-        self.goal_y = float(self.get_parameter('goal_y').value)
+        self.goal_x_world = float(self.get_parameter('goal_x').value)
+        self.goal_y_world = float(self.get_parameter('goal_y').value)
+        self.spawn_x = float(self.get_parameter('spawn_x').value)
+        self.spawn_y = float(self.get_parameter('spawn_y').value)
+
         self.k_att = float(self.get_parameter('k_att').value)
         self.k_rep = float(self.get_parameter('k_rep').value)
         self.d_obs = float(self.get_parameter('d_obs').value)
@@ -36,9 +42,17 @@ class PotentialFieldPlanner(Node):
         self.front_clearance_distance = float(self.get_parameter('front_clearance_distance').value)
         self.front_slow_linear_cap = float(self.get_parameter('front_slow_linear_cap').value)
 
+        self.goal_x_odom = None
+        self.goal_y_odom = None
+
         self.current_x = 0.0
         self.current_y = 0.0
         self.current_yaw = 0.0
+
+        self.start_x = None
+        self.start_y = None
+        self.start_yaw = None
+
         self.scan_data = None
         self.scan_angles = None
         self.goal_reached = False
@@ -49,7 +63,7 @@ class PotentialFieldPlanner(Node):
         self.timer = self.create_timer(0.1, self.control_loop)
 
         self.get_logger().info(
-            f'Planner initialized. Goal=({self.goal_x}, {self.goal_y}), mode=Potential field'
+            f'Planner initialized. Goal(world)=({self.goal_x_world}, {self.goal_y_world}), mode=Potential field'
         )
 
     def euler_from_quaternion(self, q):
@@ -68,6 +82,30 @@ class PotentialFieldPlanner(Node):
         self.current_x = msg.pose.pose.position.x
         self.current_y = msg.pose.pose.position.y
         self.current_yaw = self.euler_from_quaternion(msg.pose.pose.orientation)
+
+        if self.start_x is None:
+            self.start_x = self.current_x
+            self.start_y = self.current_y
+            self.start_yaw = self.current_yaw
+
+            dx_world = self.goal_x_world - self.spawn_x
+            dy_world = self.goal_y_world - self.spawn_y
+
+            c = math.cos(self.start_yaw)
+            s = math.sin(self.start_yaw)
+
+            dx_odom = c * dx_world + s * dy_world
+            dy_odom = -s * dx_world + c * dy_world
+
+            self.goal_x_odom = self.current_x + dx_odom
+            self.goal_y_odom = self.current_y + dy_odom
+
+            self.get_logger().info(
+                f'Initial yaw={self.start_yaw:.2f} rad | '
+                f'world_delta=({dx_world:.2f}, {dy_world:.2f}) -> '
+                f'odom_delta=({dx_odom:.2f}, {dy_odom:.2f}) | '
+                f'goal_odom=({self.goal_x_odom:.2f}, {self.goal_y_odom:.2f})'
+            )
 
     def scan_callback(self, msg):
         ranges = np.array(msg.ranges, dtype=np.float64)
@@ -95,7 +133,9 @@ class PotentialFieldPlanner(Node):
         self.publish_cmd(0.0, 0.0)
 
     def distance_to_goal(self):
-        return math.hypot(self.goal_x - self.current_x, self.goal_y - self.current_y)
+        if self.goal_x_odom is None or self.goal_y_odom is None:
+            return float('inf')
+        return math.hypot(self.goal_x_odom - self.current_x, self.goal_y_odom - self.current_y)
 
     def front_distance(self):
         indices = np.where((self.scan_angles >= -0.30) & (self.scan_angles <= 0.30))[0]
@@ -104,8 +144,8 @@ class PotentialFieldPlanner(Node):
         return float(np.min(self.scan_data[indices]))
 
     def run_potential_field(self):
-        dx_goal = self.goal_x - self.current_x
-        dy_goal = self.goal_y - self.current_y
+        dx_goal = self.goal_x_odom - self.current_x
+        dy_goal = self.goal_y_odom - self.current_y
         goal_dist = math.hypot(dx_goal, dy_goal)
 
         f_att_x = self.k_att * dx_goal
@@ -144,6 +184,8 @@ class PotentialFieldPlanner(Node):
     def control_loop(self):
         if self.scan_data is None or self.scan_angles is None:
             return
+        if self.goal_x_odom is None or self.goal_y_odom is None:
+            return
 
         goal_dist = self.distance_to_goal()
 
@@ -152,7 +194,7 @@ class PotentialFieldPlanner(Node):
                 self.goal_reached = True
                 self.get_logger().info(
                     f'Goal reached. Final pose=({self.current_x:.2f}, {self.current_y:.2f}), '
-                    f'goal=({self.goal_x:.2f}, {self.goal_y:.2f}), dist={goal_dist:.3f}'
+                    f'goal=({self.goal_x_odom:.2f}, {self.goal_y_odom:.2f}), dist={goal_dist:.3f}'
                 )
             self.stop_robot()
             return
