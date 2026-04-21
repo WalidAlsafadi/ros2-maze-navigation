@@ -1,15 +1,11 @@
 # ROS 2 Maze Navigation with TurtleBot3 Burger
 
-Autonomous maze navigation project built with **ROS 2 Jazzy**, **Gazebo Harmonic**, **ros_gz_bridge**, and **TurtleBot3 Burger**. The project implements a **Potential Field** planner for the base maze and an extended **wall-following escape strategy** for the bonus complex maze.
-
-This repository is written to serve two purposes:
-
-- **Course submission README** with exact setup and launch steps.
-- **Portfolio README** that explains the technical design, results, and engineering decisions.
+Autonomous maze navigation project built with **ROS 2 Jazzy**, **Gazebo Harmonic**, **ros_gz_bridge**, and **TurtleBot3 Burger**.  
+The project implements a **Potential Field** planner for the base maze and an extended **wall-following escape strategy** for the bonus complex maze.
 
 ## Project Overview
 
-This project was developed for a ROS 2 robot simulation course. The robot is spawned inside a Gazebo maze, receives **LiDAR** and **odometry** through `ros_gz_bridge`, and publishes `TwistStamped` velocity commands on `/cmd_vel` to navigate toward a goal while avoiding obstacles.
+This project was developed for a ROS 2 robot simulation course. The robot is spawned inside a Gazebo maze, receives **LiDAR** and **odometry** through `ros_gz_bridge`, and publishes `TwistStamped` velocity commands on `/cmd_vel` to navigate toward a goal while avoiding collisions.
 
 Two navigation modes were implemented:
 
@@ -107,9 +103,7 @@ sudo apt install -y \
   ros-jazzy-dynamixel-sdk
 ```
 
-## Submission-Ready Setup and Launch Instructions
-
-The steps below are written in the exact sequential style required for course submission.
+## Setup and Launch Instructions
 
 ### Step 1: Create a ROS 2 workspace
 
@@ -162,7 +156,7 @@ export TURTLEBOT3_MODEL=burger
 ros2 launch maze_navigation maze_sim.launch.py
 ```
 
-### Step 8: Launch the bonus project (optional)
+### Step 8: Launch the bonus project
 
 ```bash
 ros2 launch maze_navigation maze_bonus.launch.py
@@ -241,22 +235,33 @@ This uses:
 ros2 launch maze_navigation maze_bonus.launch.py spawn_x:=1.8 spawn_y:=9.8
 ```
 
+### Basic planner on the complex maze
+
+```bash
+ros2 launch maze_navigation maze_sim.launch.py \
+  world:=complex_maze.world \
+  spawn_x:=0.6 \
+  spawn_y:=0.6 \
+  goal_x:=11.4 \
+  goal_y:=11.4
+```
+
 ## How the System Works
 
 ### Base planner
 
 The base planner uses the **Potential Field method**:
 
-- **Attractive force** pulls the robot toward the goal.
-- **Repulsive force** pushes the robot away from nearby obstacles detected by LiDAR.
-- The combined force determines the desired heading and forward velocity.
+- **Attractive force** pulls the robot toward the goal
+- **Repulsive force** pushes the robot away from nearby obstacles detected by LiDAR
+- The combined force determines the desired heading and forward velocity
 
 ### Bonus planner
 
 The complex maze exposed local-minimum behavior, so the bonus planner extends the base idea with:
 
 - dynamic wall-follow side selection
-- local-minimum escape using wall-following
+- local-minima escape using wall-following
 - late-maze detachment logic to resume goal-seeking safely
 
 ## Invalid LiDAR Handling
@@ -315,6 +320,42 @@ Example successful bonus runs:
 - Run 2: `Goal reached. Final pose=(10.65, 10.69), goal=(10.80, 10.80), dist=0.188`
 - Run 3: `Goal reached. Final pose=(10.78, 10.62), goal=(10.80, 10.80), dist=0.186`
 
+## Demo Snapshots
+
+<table>
+  <tr>
+    <td align="center">
+      <img src="figures/run1.png" width="250"><br>
+      <sub>Base Run 1</sub>
+    </td>
+    <td align="center">
+      <img src="figures/run2.png" width="250"><br>
+      <sub>Base Run 2</sub>
+    </td>
+    <td align="center">
+      <img src="figures/run3.png" width="250"><br>
+      <sub>Base Run 3</sub>
+    </td>
+  </tr>
+</table>
+
+<table>
+  <tr>
+    <td align="center">
+      <img src="figures/bonus_run1.png" width="250"><br>
+      <sub>Bonus Run 1</sub>
+    </td>
+    <td align="center">
+      <img src="figures/bonus_run2.png" width="250"><br>
+      <sub>Bonus Run 2</sub>
+    </td>
+    <td align="center">
+      <img src="figures/bonus_run3.png" width="250"><br>
+      <sub>Bonus Run 3</sub>
+    </td>
+  </tr>
+</table>
+
 ## Requirement Coverage
 
 ### Base project
@@ -339,10 +380,10 @@ This repository also includes an optional bonus solution that covers:
 
 ## Notes on Evaluation and Final Stopping Position
 
-- Goal completion is evaluated using the robot's **odometry position**.
-- The final stopping position may vary slightly between runs because of simulation timing, wheel slip, and odometry drift.
-- Small visual differences in the Gazebo top view are acceptable as long as the robot stops within the required goal tolerance.
-- In both base and bonus testing, the terminal output is reported in the planner's **internal odometry frame**, while the official start and goal positions remain defined in the world frame.
+- Goal completion is evaluated using the robot's **odometry position**
+- The final stopping position may vary slightly between runs because of simulation timing, wheel slip, and odometry drift
+- Small visual differences in the Gazebo top view are acceptable as long as the robot stops within the required goal tolerance
+- In both base and bonus testing, the terminal output is reported in the planner's **internal odometry frame**, while the official start and goal positions remain defined in the world frame
 
 ## Troubleshooting
 
@@ -387,16 +428,17 @@ source ~/ros2_project_ws/install/setup.bash
 
 This project was tested on WSL Ubuntu 24.04. Gazebo performance may be slower depending on hardware, GPU support, and Windows graphics configuration. This may affect visualization smoothness but does not necessarily affect the correctness of the navigation logic.
 
-## Portfolio Notes
+## Engineering Highlights
 
-From a portfolio perspective, this project demonstrates:
+From a technical perspective, this project demonstrates:
 
 - ROS 2 workspace setup and dependency integration
 - simulator-to-ROS topic bridging with `ros_gz_bridge`
 - real-time sensor processing
 - Potential Field local planning
-- practical engineering tradeoffs around odometry drift and simulation physics
-- iterative debugging and recovery-strategy design for local-minimum problems
+- practical handling of invalid LiDAR readings
+- debugging around odometry drift and simulation physics
+- recovery-strategy design for local-minimum situations in a complex maze
 
 ## Future Improvements
 
