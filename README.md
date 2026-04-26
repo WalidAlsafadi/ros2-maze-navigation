@@ -292,6 +292,13 @@ These topics allow the planner to:
 - publish robot velocity commands
 - stay synchronized with simulation time
 
+### ROS Graph
+
+The following ROS graph shows the main runtime communication in the project.  
+`/ros_gz_bridge` publishes `/odom` and `/scan` to the planner, while the planner publishes `/cmd_vel` back through the bridge to Gazebo.
+
+![ROS Graph](figures/rosgraph.png)
+
 ## Results Summary
 
 ### Base maze
